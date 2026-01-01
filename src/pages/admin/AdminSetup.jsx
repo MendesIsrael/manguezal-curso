@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useData } from '../../contexts/DataContext';
 
 function AdminSetup() {
     const { professorInfo, updateProfessorInfo } = useAuth();
@@ -189,6 +190,29 @@ function AdminSetup() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+                <div className="content-card" style={{ marginTop: '2rem', borderTop: '4px solid #dc2626' }}>
+                    <div className="content-card-header">
+                        <h2 style={{ color: '#dc2626' }}>⚠️ Zona de Perigo - Banco de Dados</h2>
+                    </div>
+                    <div className="content-card-body">
+                        <p style={{ marginBottom: '1rem', color: '#666' }}>
+                            Utilize esta opção apenas se o banco de dados estiver vazio ou corrompido.
+                            Esta ação irá popular o banco com os dados iniciais do curso (cursos, módulos, exercícios padrão).
+                        </p>
+                        <button
+                            type="button"
+                            className="btn"
+                            style={{ backgroundColor: '#dc2626', color: 'white' }}
+                            onClick={() => {
+                                if (window.confirm('Tem certeza? Isso pode duplicar dados existem se o banco não estiver vazio.')) {
+                                    useData().seedDatabase();
+                                }
+                            }}
+                        >
+                            🔄 Restaurar/Popular Banco de Dados (Seed)
+                        </button>
                     </div>
                 </div>
             </div>

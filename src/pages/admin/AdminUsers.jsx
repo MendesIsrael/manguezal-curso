@@ -14,22 +14,18 @@ function AdminUsers() {
     );
 
     const handleResetClick = (user) => {
-        setEditingUser(user);
-        setNewPassword('');
+        if (window.confirm(`Deseja enviar um e-mail de redefinição de senha para ${user.name} (${user.email})?`)) {
+            handleSendReset(user.email);
+        }
     };
 
-    const handleSavePassword = () => {
-        if (!newPassword) {
-            alert('Digite uma nova senha');
-            return;
+    const handleSendReset = async (email) => {
+        const result = await resetUserPassword(email);
+        if (result.success) {
+            alert(result.message);
+        } else {
+            alert('Erro: ' + result.error);
         }
-
-        resetUserPassword(editingUser.id, newPassword);
-        alert(`Senha de ${editingUser.name} redefinida com sucesso!`);
-        setEditingUser(null);
-        setNewPassword('');
-        // Refresh list (though local state usually updates if we re-fetch, but getAllStudents reads from storage)
-        setStudents(getAllStudents());
     };
 
     return (
@@ -74,9 +70,9 @@ function AdminUsers() {
                                             <button
                                                 className="btn-text"
                                                 onClick={() => handleResetClick(student)}
-                                                title="Redefinir Senha"
+                                                title="Enviar Email de Redefinição"
                                             >
-                                                🔑 Redefinir Senha
+                                                📧 Redefinir Senha
                                             </button>
                                         </td>
                                     </tr>
@@ -92,52 +88,6 @@ function AdminUsers() {
                     </table>
                 </div>
             </div>
-
-            {/* Modal de Redefinição de Senha */}
-            {editingUser && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h3>Redefinir Senha - {editingUser.name}</h3>
-                            <button
-                                className="close-btn"
-                                onClick={() => setEditingUser(null)}
-                            >
-                                ×
-                            </button>
-                        </div>
-                        <div className="modal-body">
-                            <div className="form-group">
-                                <label>Nova Senha</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    value={newPassword}
-                                    onChange={(e) => setNewPassword(e.target.value)}
-                                    placeholder="Digite a nova senha"
-                                />
-                                <small className="help-text">
-                                    Informe esta senha ao aluno para que ele possa acessar.
-                                </small>
-                            </div>
-                        </div>
-                        <div className="modal-footer">
-                            <button
-                                className="btn-secondary"
-                                onClick={() => setEditingUser(null)}
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                className="btn-primary"
-                                onClick={handleSavePassword}
-                            >
-                                Salvar Nova Senha
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

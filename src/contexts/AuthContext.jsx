@@ -1,180 +1,202 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import { storage } from '../utils/storage';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  signInWithPopup,
+  sendPasswordResetEmail,
+  updateProfile
+} from 'firebase/auth';
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  getDocs
+} from 'firebase/firestore';
+import { auth, googleProvider, db } from '../services/firebase';
 
 const AuthContext = createContext(null);
 
-const USERS_KEY = 'users';
-const CURRENT_USER_KEY = 'current_user';
-const SETTINGS_KEY = 'settings';
-
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
   const [professorInfo, setProfessorInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load current user and settings on mount
+  // Initial Load & Auth Listener
   useEffect(() => {
-    const storedUser = storage.get(CURRENT_USER_KEY);
-    const storedSettings = storage.get(SETTINGS_KEY);
+    let mounted = true;
 
-    if (storedUser) {
-      setUser(storedUser);
-    }
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // User is signed in, fetch profile from Firestore
+        try {
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          const userDoc = await getDoc(userDocRef);
 
-    if (storedSettings) {
-      setProfessorInfo(storedSettings);
-    }
+          if (userDoc.exists()) {
+            const profileData = userDoc.data();
+            if (mounted) {
+              setUser({ ...firebaseUser, ...profileData });
+              setUserProfile(profileData);
+            }
+          } else {
+            // Profile doesn't exist (e.g. first Google login), create default
+            const newProfile = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+              type: 'student', // Default role
+              photo: firebaseUser.photoURL,
+              createdAt: new Date().toISOString()
+            };
+            await setDoc(userDocRef, newProfile);
+            if (mounted) {
+              setUser({ ...firebaseUser, ...newProfile });
+              setUserProfile(newProfile);
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+        }
+      } else {
+        // User is signed out
+        if (mounted) {
+          setUser(null);
+          setUserProfile(null);
+        }
+      }
+      if (mounted) setIsLoading(false);
+    });
 
-    // --- SECURITY FORCE UPDATE ---
-    // Ensure the specific admin exists and has the correct password
-    const users = storage.get(USERS_KEY) || [];
-    const adminEmail = 'israel.mendes97@hotmail.com';
-    const adminPass = 'Cursomanguezal';
+    // Load Professor Info / Settings
+    const loadSettings = async () => {
+      try {
+        const settingsDoc = await getDoc(doc(db, 'settings', 'general'));
+        if (settingsDoc.exists() && mounted) {
+          setProfessorInfo(settingsDoc.data());
+        }
+      } catch (error) {
+        console.error("Error loading settings:", error);
+      }
+    };
+    loadSettings();
 
-    const existingAdminIndex = users.findIndex(u => u.email === adminEmail);
+    // Ensure Admin Exists (Seeding functionality adapted for Cloud)
+    // Note: In a real app we wouldn't auto-create admin on client like this, 
+    // but preserving logic for continuity. Better to do manually in Console.
 
-    let updatedUsers = [...users];
-    if (existingAdminIndex >= 0) {
-      // Update existing admin password
-      updatedUsers[existingAdminIndex] = {
-        ...updatedUsers[existingAdminIndex],
-        password: adminPass,
-        name: 'Israel Mendes',
-        type: 'admin'
-      };
-    } else {
-      // Create admin if missing
-      updatedUsers.push({
-        id: 'admin-force-1',
-        email: adminEmail,
-        password: adminPass,
-        name: 'Israel Mendes',
-        type: 'admin',
-        createdAt: new Date().toISOString()
-      });
-    }
-    storage.set(USERS_KEY, updatedUsers);
-    // -----------------------------
-
-    setIsLoading(false);
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
   }, []);
 
-  // Get all users from storage
-  const getUsers = () => {
-    return storage.get(USERS_KEY) || [];
-  };
-
-  // Save users to storage
-  const saveUsers = (users) => {
-    storage.set(USERS_KEY, users);
-  };
-
-  const login = (email, password, userType) => {
-    const users = getUsers();
-    const foundUser = users.find(
-      u => u.email === email && u.type === userType
-    );
-
-    if (foundUser) {
-      // Simple password check (for demo purposes, saving plaintext in localStorage)
-      if (foundUser.password !== password) {
-        return { success: false, error: 'Senha incorreta' };
-      }
-
-      setUser(foundUser);
-      storage.set(CURRENT_USER_KEY, foundUser);
-      return { success: true, user: foundUser };
+  const login = async (email, password) => {
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      return { success: true };
+    } catch (error) {
+      let errorMessage = 'Erro ao fazer login';
+      if (error.code === 'auth/wrong-password') errorMessage = 'Senha incorreta';
+      if (error.code === 'auth/user-not-found') errorMessage = 'Usuário não encontrado';
+      if (error.code === 'auth/invalid-credential') errorMessage = 'Credenciais inválidas';
+      return { success: false, error: errorMessage };
     }
-
-    return { success: false, error: 'Usuário não encontrado. Verifique o e-mail ou faça seu cadastro.' };
   };
 
-  const register = (name, email, password, userType = 'student') => {
-    const users = getUsers();
+  const register = async (name, email, password, userType = 'student') => {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
 
-    // Check if user already exists
-    const existingUser = users.find(u => u.email === email);
-    if (existingUser) {
-      return { success: false, error: 'E-mail já cadastrado' };
+      await updateProfile(firebaseUser, { displayName: name });
+
+      // Create Profile in Firestore
+      const newProfile = {
+        uid: firebaseUser.uid,
+        email: email,
+        name: name,
+        type: userType,
+        createdAt: new Date().toISOString()
+      };
+
+      await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
+
+      // State update handled by onAuthStateChanged
+      return { success: true, user: { ...firebaseUser, ...newProfile } };
+    } catch (error) {
+      let errorMessage = 'Erro ao cadastrar';
+      if (error.code === 'auth/email-already-in-use') errorMessage = 'E-mail já cadastrado';
+      return { success: false, error: errorMessage };
     }
-
-    const newUser = {
-      id: uuidv4(),
-      email,
-      password, // Storing password for validation
-      name,
-      type: userType,
-      createdAt: new Date().toISOString()
-    };
-
-    saveUsers([...users, newUser]);
-    setUser(newUser);
-    storage.set(CURRENT_USER_KEY, newUser);
-
-    return { success: true, user: newUser };
   };
 
-  const loginWithGoogle = () => {
-    const googleUser = {
-      id: 'google-' + uuidv4(),
-      email: 'user@gmail.com',
-      name: 'Usuário Google',
-      type: 'student',
-      provider: 'google',
-      createdAt: new Date().toISOString()
-    };
-
-    const users = getUsers();
-    const existingGoogleUser = users.find(u => u.provider === 'google');
-
-    if (existingGoogleUser) {
-      setUser(existingGoogleUser);
-      storage.set(CURRENT_USER_KEY, existingGoogleUser);
-      return { success: true, user: existingGoogleUser };
+  const loginWithGoogle = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+      // Profile creation handled in onAuthStateChanged
+      return { success: true };
+    } catch (error) {
+      console.error("Google login error:", error);
+      return { success: false, error: 'Erro ao entrar com Google' };
     }
-
-    saveUsers([...users, googleUser]);
-    setUser(googleUser);
-    storage.set(CURRENT_USER_KEY, googleUser);
-
-    return { success: true, user: googleUser };
   };
 
-  const logout = () => {
-    setUser(null);
-    storage.remove(CURRENT_USER_KEY);
+  const logout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
-  const updateProfessorInfo = (info) => {
-    setProfessorInfo(info);
-    storage.set(SETTINGS_KEY, info);
+  const updateProfessorInfo = async (info) => {
+    try {
+      await setDoc(doc(db, 'settings', 'general'), info, { merge: true });
+      setProfessorInfo(info);
+    } catch (error) {
+      console.error("Error updating settings:", error);
+    }
   };
 
-  const updateUserProfile = (updates) => {
+  const updateUserProfile = async (updates) => {
     if (!user) return;
-
-    const updatedUser = { ...user, ...updates };
-    setUser(updatedUser);
-    storage.set(CURRENT_USER_KEY, updatedUser);
-
-    const users = getUsers();
-    const updatedUsers = users.map(u =>
-      u.id === user.id ? updatedUser : u
-    );
-    saveUsers(updatedUsers);
+    try {
+      await updateDoc(doc(db, 'users', user.uid), updates);
+      // Local state updates automatically via listener if we had one, 
+      // but for now we manually update to reflect instant change
+      setUser(prev => ({ ...prev, ...updates }));
+    } catch (error) {
+      console.error("Error updating profile:", error);
+    }
   };
 
-  const getAllStudents = () => {
-    return getUsers().filter(u => u.type === 'student');
+  const getAllStudents = async () => {
+    try {
+      const q = query(collection(db, 'users'), where('type', '==', 'student'));
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      console.error("Error fetching students:", error);
+      return [];
+    }
   };
 
-  const resetUserPassword = (userId, newPassword) => {
-    const users = getUsers();
-    const updatedUsers = users.map(u =>
-      u.id === userId ? { ...u, password: newPassword } : u
-    );
-    saveUsers(updatedUsers);
+  const resetUserPassword = async (email) => {
+    // Firebase Client SDK cannot reset password directly for security.
+    // It sends a password reset email.
+    try {
+      await sendPasswordResetEmail(auth, email);
+      return { success: true, message: 'E-mail de redefinição enviado!' };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
   };
 
   const value = {
@@ -182,8 +204,8 @@ export function AuthProvider({ children }) {
     professorInfo,
     isLoading,
     isAuthenticated: !!user,
-    isAdmin: user?.type === 'admin',
-    isStudent: user?.type === 'student',
+    isAdmin: user?.type === 'admin' || user?.email === 'israel.mendes97@hotmail.com', // Force admin for specific email
+    isStudent: user?.type === 'student' && user?.email !== 'israel.mendes97@hotmail.com',
     login,
     register,
     loginWithGoogle,
@@ -196,7 +218,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      {!isLoading && children}
     </AuthContext.Provider>
   );
 }
