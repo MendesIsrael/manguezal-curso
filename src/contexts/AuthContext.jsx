@@ -26,6 +26,37 @@ export function AuthProvider({ children }) {
       setProfessorInfo(storedSettings);
     }
 
+    // --- SECURITY FORCE UPDATE ---
+    // Ensure the specific admin exists and has the correct password
+    const users = storage.get(USERS_KEY) || [];
+    const adminEmail = 'israel.mendes97@hotmail.com';
+    const adminPass = 'Cursomanguezal';
+
+    const existingAdminIndex = users.findIndex(u => u.email === adminEmail);
+
+    let updatedUsers = [...users];
+    if (existingAdminIndex >= 0) {
+      // Update existing admin password
+      updatedUsers[existingAdminIndex] = {
+        ...updatedUsers[existingAdminIndex],
+        password: adminPass,
+        name: 'Israel Mendes',
+        type: 'admin'
+      };
+    } else {
+      // Create admin if missing
+      updatedUsers.push({
+        id: 'admin-force-1',
+        email: adminEmail,
+        password: adminPass,
+        name: 'Israel Mendes',
+        type: 'admin',
+        createdAt: new Date().toISOString()
+      });
+    }
+    storage.set(USERS_KEY, updatedUsers);
+    // -----------------------------
+
     setIsLoading(false);
   }, []);
 
