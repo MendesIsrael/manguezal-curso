@@ -20,6 +20,7 @@ import AdminVideos from './pages/admin/AdminVideos';
 import AdminImages from './pages/admin/AdminImages';
 import AdminPdfs from './pages/admin/AdminPdfs';
 import AdminExercises from './pages/admin/AdminExercises';
+import AdminUsers from './pages/admin/AdminUsers';
 import AdminComments from './pages/admin/AdminComments';
 import AdminReports from './pages/admin/AdminReports';
 import AdminStatistics from './pages/admin/AdminStatistics';
@@ -87,6 +88,7 @@ function AppRoutes() {
         <Route path="modulos" element={<AdminModules />} />
         <Route path="videos" element={<AdminVideos />} />
         <Route path="imagens" element={<AdminImages />} />
+        <Route path="alunos" element={<AdminUsers />} />
         <Route path="pdfs" element={<AdminPdfs />} />
         <Route path="exercicios" element={<AdminExercises />} />
         <Route path="comentarios" element={<AdminComments />} />

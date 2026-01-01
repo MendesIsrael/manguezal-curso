@@ -73,6 +73,10 @@ function AdminLayout() {
                                 <span className="sidebar-badge">{unresolvedCount}</span>
                             )}
                         </NavLink>
+                        <NavLink to="/admin/alunos" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+                            <span className="icon">👥</span>
+                            <span>Alunos</span>
+                        </NavLink>
                     </div>
 
                     <div className="sidebar-section">

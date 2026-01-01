@@ -5,7 +5,7 @@ export const generateInitialData = () => {
     const adminUser = {
         id: 'admin-1',
         email: 'israel.mendes97@hotmail.com',
-        password: 'a1b2c3A1B2C3',
+        password: 'Cursomanguezal',
         name: 'Israel Mendes',
         type: 'admin',
         createdAt: new Date().toISOString()

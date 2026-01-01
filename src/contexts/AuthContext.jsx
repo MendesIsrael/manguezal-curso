@@ -138,6 +138,14 @@ export function AuthProvider({ children }) {
     return getUsers().filter(u => u.type === 'student');
   };
 
+  const resetUserPassword = (userId, newPassword) => {
+    const users = getUsers();
+    const updatedUsers = users.map(u =>
+      u.id === userId ? { ...u, password: newPassword } : u
+    );
+    saveUsers(updatedUsers);
+  };
+
   const value = {
     user,
     professorInfo,
@@ -152,6 +160,7 @@ export function AuthProvider({ children }) {
     updateProfessorInfo,
     updateUserProfile,
     getAllStudents,
+    resetUserPassword,
   };
 
   return (
