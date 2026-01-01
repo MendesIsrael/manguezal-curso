@@ -4,9 +4,9 @@ import { v4 as uuidv4 } from 'uuid';
 export const generateInitialData = () => {
     const adminUser = {
         id: 'admin-1',
-        email: 'admin@manguezal.com',
-        password: 'admin123',
-        name: 'Professor Administrador',
+        email: 'israel.mendes97@hotmail.com',
+        password: 'a1b2c3A1B2C3',
+        name: 'Israel Mendes',
         type: 'admin',
         createdAt: new Date().toISOString()
     };

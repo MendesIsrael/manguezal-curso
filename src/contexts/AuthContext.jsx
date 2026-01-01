@@ -46,26 +46,17 @@ export function AuthProvider({ children }) {
     );
 
     if (foundUser) {
-      // In a real app, verify password here
+      // Simple password check (for demo purposes, saving plaintext in localStorage)
+      if (foundUser.password !== password) {
+        return { success: false, error: 'Senha incorreta' };
+      }
+
       setUser(foundUser);
       storage.set(CURRENT_USER_KEY, foundUser);
       return { success: true, user: foundUser };
     }
 
-    // For demo purposes, create user if not found (simulated login)
-    const newUser = {
-      id: uuidv4(),
-      email,
-      name: userType === 'admin' ? 'Administrador' : email.split('@')[0],
-      type: userType,
-      createdAt: new Date().toISOString()
-    };
-
-    saveUsers([...users, newUser]);
-    setUser(newUser);
-    storage.set(CURRENT_USER_KEY, newUser);
-
-    return { success: true, user: newUser };
+    return { success: false, error: 'Usuário não encontrado. Verifique o e-mail ou faça seu cadastro.' };
   };
 
   const register = (name, email, password, userType = 'student') => {
@@ -80,6 +71,7 @@ export function AuthProvider({ children }) {
     const newUser = {
       id: uuidv4(),
       email,
+      password, // Storing password for validation
       name,
       type: userType,
       createdAt: new Date().toISOString()

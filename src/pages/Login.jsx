@@ -12,12 +12,16 @@ function Login() {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        login(email, password, userType);
+        const result = login(email, password, userType);
 
-        if (userType === 'admin') {
-            navigate('/admin');
+        if (result.success) {
+            if (userType === 'admin') {
+                navigate('/admin');
+            } else {
+                navigate('/aluno');
+            }
         } else {
-            navigate('/aluno');
+            alert(result.error);
         }
     };
 
